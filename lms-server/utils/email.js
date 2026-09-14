@@ -1,31 +1,84 @@
-const { Resend } = require('resend');
+const { google } = require('googleapis');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+});
+
+const gmail = google.gmail({
+  version: 'v1',
+  auth: oauth2Client,
+});
+
+
+// Create Gmail-compatible MIME message
+const createRawMessage = ({ to, from, subject, text, html }) => {
+  const message = [
+    `From: Smart Learn LMS <${from}>`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/alternative; boundary="boundary123"',
+    '',
+    '--boundary123',
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    text,
+    '',
+    '--boundary123',
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    html,
+    '',
+    '--boundary123--',
+  ].join('\r\n');
+
+  return Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
 
 // Common email sender
 const sendEmail = async (to, subject, text, html = null) => {
   try {
-    console.log('📧 Sending email via Resend...');
+    console.log('📧 Sending email via Gmail API...');
     console.log('To:', to);
 
-    const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM,
-      to: [to],
+    const rawMessage = createRawMessage({
+      to,
+      from: process.env.GMAIL_USER_EMAIL,
       subject,
       text,
-      ...(html ? { html } : {}),
+      html: html || text,
     });
 
-    if (error) {
-      console.error('❌ Resend email error:', error);
-      throw new Error(error.message || 'Failed to send email');
-    }
+    const response = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: rawMessage,
+      },
+    });
 
-    console.log('✅ Email sent successfully:', data?.id);
+    console.log(
+      '✅ Email sent successfully:',
+      response.data.id
+    );
 
-    return data;
+    return response.data;
+
   } catch (err) {
-    console.error('❌ Email sending failed:', err);
+    console.error(
+      '❌ Gmail API email sending failed:',
+      err.response?.data || err.message
+    );
+
     throw err;
   }
 };
@@ -66,7 +119,6 @@ If you did not request a password reset, you can safely ignore this email.
   font-family:Arial, Helvetica, sans-serif;
 ">
 
-  <!-- Main Container -->
   <div style="
     width:100%;
     padding:45px 15px;
@@ -82,7 +134,6 @@ If you did not request a password reset, you can safely ignore this email.
       box-shadow:0 8px 30px rgba(15,23,42,0.10);
     ">
 
-      <!-- Header -->
       <div style="
         background:linear-gradient(135deg,#2563eb,#4f46e5);
         padding:32px 25px;
@@ -122,8 +173,6 @@ If you did not request a password reset, you can safely ignore this email.
 
       </div>
 
-
-      <!-- Content -->
       <div style="
         padding:40px 35px;
         text-align:center;
@@ -159,8 +208,6 @@ If you did not request a password reset, you can safely ignore this email.
           Use the verification code below to continue.
         </p>
 
-
-        <!-- OTP Card -->
         <div style="
           margin:30px auto;
           padding:25px 20px;
@@ -192,8 +239,6 @@ If you did not request a password reset, you can safely ignore this email.
 
         </div>
 
-
-        <!-- Expiry -->
         <div style="
           display:inline-block;
           padding:10px 16px;
@@ -206,8 +251,6 @@ If you did not request a password reset, you can safely ignore this email.
           ⏱️ This OTP expires in 10 minutes
         </div>
 
-
-        <!-- Security Notice -->
         <div style="
           margin-top:30px;
           padding:18px;
@@ -239,8 +282,6 @@ If you did not request a password reset, you can safely ignore this email.
 
       </div>
 
-
-      <!-- Footer -->
       <div style="
         padding:22px 25px;
         background:#f8fafc;

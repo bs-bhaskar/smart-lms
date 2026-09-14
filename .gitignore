@@ -136,3 +136,5 @@ dist
 .pnp.*
 lms-server/uploads/*
 !lms-server/uploads/.gitkeep
+
+google-credentials.json
