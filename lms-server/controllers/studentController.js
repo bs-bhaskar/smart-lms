@@ -91,22 +91,36 @@ exports.login = async (req, res) => {
 /* ------------------ STUDY BOT ------------------ */
 exports.studyBot = async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, history = [] } = req.body;
+
     if (!prompt) {
-      return res.status(400).json({ message: 'Prompt is required' });
+      return res.status(400).json({
+        message: 'Prompt is required'
+      });
     }
 
     const studentId = req.user.id;
 
-    const courses = await Course.find({ students: studentId }).select('title');
-    const timetables = await Timetable.find({ students: studentId }).select('schedule');
+    const courses = await Course.find({
+      students: studentId
+    }).select('title');
+
+    const timetables = await Timetable.find({
+      students: studentId
+    }).select('schedule');
 
     const context = {
       courses: courses.map(c => c.title),
-      nextClass: timetables[0]?.schedule?.[0]?.day || 'your next class',
+      nextClass:
+        timetables[0]?.schedule?.[0]?.day ||
+        'your next class',
     };
 
-    const result = await getStudyHelp({ prompt, context });
+    const result = await getStudyHelp({
+      prompt,
+      context,
+      history,
+    });
 
     res.json({
       source: result.source,
@@ -114,9 +128,13 @@ exports.studyBot = async (req, res) => {
       answer: result.answer,
       context,
     });
+
   } catch (err) {
     console.error('Study bot error:', err);
-    res.status(500).json({ message: 'Server error' });
+
+    res.status(500).json({
+      message: 'Server error'
+    });
   }
 };
 
